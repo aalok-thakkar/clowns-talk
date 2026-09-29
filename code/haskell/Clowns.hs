@@ -38,16 +38,19 @@ plugList (ListZipper bs x as) = foldl' (flip (:)) (x : as) bs
 
 -- Tree zipper ---------------------------------------------------------
 
-data Tree a = Leaf | Node (Tree a) a (Tree a)
+data Tree a =
+    Leaf
+  | Node (Tree a) a (Tree a)
   deriving (Eq, Show)
 
-data Step a = WentLeft a (Tree a) | WentRight (Tree a) a
+data Step a =
+    WentLeft a (Tree a)
+  | WentRight (Tree a) a
   deriving (Eq, Show)
 
-data Loc a = Loc
-  { subtree :: Tree a
-  , path    :: [Step a]
-  } deriving (Eq, Show)
+data Loc a =
+  Loc (Tree a) [Step a]
+  deriving (Eq, Show)
 
 downLeft :: Loc a -> Maybe (Loc a)
 downLeft = \case
@@ -66,44 +69,83 @@ up = \case
   Loc _ []                  -> Nothing
 
 rebuild :: Loc a -> Tree a
-rebuild loc = case up loc of
+rebuild loc@(Loc t _) = case up loc of
   Just loc' -> rebuild loc'
-  Nothing   -> subtree loc
+  Nothing   -> t
 
 -- Polynomial functors: one layer of a datatype ------------------------
 
-newtype K a   x = K a                     deriving Functor
-newtype I     x = I x                     deriving Functor
-data (p :+: q) x = L (p x) | R (q x)      deriving Functor
-data (p :*: q) x = p x :*: q x            deriving Functor
+newtype K a x =
+  K a
+  deriving Functor
+
+newtype I x =
+  I x
+  deriving Functor
+
+data (p :+: q) x =
+    L (p x)
+  | R (q x)
+  deriving Functor
+
+data (p :*: q) x =
+  p x :*: q x
+  deriving Functor
 
 infixr 6 :+:
 infixr 7 :*:
 
 -- Polynomial bifunctors: clowns c, jokers j ---------------------------
 
-newtype K2 a       c j = K2 a
-newtype Clowns p   c j = Clowns (p c)
-newtype Jokers p   c j = Jokers (p j)
-data (p :++: q)    c j = L2 (p c j) | R2 (q c j)
-data (p :**: q)    c j = p c j :**: q c j
+newtype K2 a c j =
+  K2 a
+
+newtype Clowns p c j =
+  Clowns (p c)
+
+newtype Jokers p c j =
+  Jokers (p j)
+
+data (p :++: q) c j =
+    L2 (p c j)
+  | R2 (q c j)
+
+data (p :**: q) c j =
+  p c j :**: q c j
 
 infixr 6 :++:
 infixr 7 :**:
 
+instance Functor (K2 a c) where
+  fmap _ (K2 a) = K2 a
+
 instance Bifunctor (K2 a) where
   bimap _ _ (K2 a) = K2 a
+
+instance Functor (Clowns p c) where
+  fmap _ (Clowns pc) = Clowns pc
 
 instance Functor p => Bifunctor (Clowns p) where
   bimap f _ (Clowns pc) = Clowns (fmap f pc)
 
+instance Functor p => Functor (Jokers p c) where
+  fmap g (Jokers pj) = Jokers (fmap g pj)
+
 instance Functor p => Bifunctor (Jokers p) where
   bimap _ g (Jokers pj) = Jokers (fmap g pj)
+
+instance (Bifunctor p, Bifunctor q) => Functor ((p :++: q) c) where
+  fmap g = \case
+    L2 pd -> L2 (second g pd)
+    R2 qd -> R2 (second g qd)
 
 instance (Bifunctor p, Bifunctor q) => Bifunctor (p :++: q) where
   bimap f g = \case
     L2 pd -> L2 (bimap f g pd)
     R2 qd -> R2 (bimap f g qd)
+
+instance (Bifunctor p, Bifunctor q) => Functor ((p :**: q) c) where
+  fmap g (pd :**: qd) = second g pd :**: second g qd
 
 instance (Bifunctor p, Bifunctor q) => Bifunctor (p :**: q) where
   bimap f g (pd :**: qd) = bimap f g pd :**: bimap f g qd
@@ -164,7 +206,8 @@ tmap f = go . right . Left
     go (Left (s, d)) = go (right (Right (d, f s)))
     go (Right pt)    = pt
 
-newtype Mu p = In (p (Mu p))
+newtype Mu p =
+  In (p (Mu p))
 
 tfold :: forall p d v. Dissect p d => (p v -> v) -> Mu p -> v
 tfold phi t0 = load t0 []
@@ -226,9 +269,13 @@ evalAlg = \case
 eval :: Expr -> Int
 eval = tfold evalAlg
 
-data Tm = Val Int | Add Tm Tm
+data Tm =
+    Val Int
+  | Add Tm Tm
 
-data Frame = AddL Tm | AddR Int
+data Frame =
+    AddL Tm
+  | AddR Int
 
 evalByHand :: Tm -> Int
 evalByHand e0 = load e0 []
