@@ -19,24 +19,22 @@ import Data.Void      (Void, absurd)
 
 -- List zipper ---------------------------------------------------------
 
-data Zipper a = Zipper
-  { before :: [a]
-  , focus  :: a
-  , after  :: [a]
-  } deriving (Eq, Show)
+data ListZipper a =
+  ListZipper [a] a [a]
+  deriving (Eq, Show)
 
-moveRight :: Zipper a -> Maybe (Zipper a)
+moveRight :: ListZipper a -> Maybe (ListZipper a)
 moveRight = \case
-  Zipper bs x (a : as) -> Just (Zipper (x : bs) a as)
+  ListZipper bs x (a : as) -> Just (ListZipper (x : bs) a as)
   _                    -> Nothing
 
-moveLeft :: Zipper a -> Maybe (Zipper a)
+moveLeft :: ListZipper a -> Maybe (ListZipper a)
 moveLeft = \case
-  Zipper (b : bs) x as -> Just (Zipper bs b (x : as))
+  ListZipper (b : bs) x as -> Just (ListZipper bs b (x : as))
   _                    -> Nothing
 
-plugList :: Zipper a -> [a]
-plugList (Zipper bs x as) = foldl' (flip (:)) (x : as) bs
+plugList :: ListZipper a -> [a]
+plugList (ListZipper bs x as) = foldl' (flip (:)) (x : as) bs
 
 -- Tree zipper ---------------------------------------------------------
 
@@ -267,7 +265,7 @@ checks =
   , ("zip up",        fmap (eval . fst) (zDown (small, []) >>= zUp) == Just 10)
   ]
   where
-    z     = Zipper [2, 1] 3 [4 :: Int]
+    z     = ListZipper [2, 1] 3 [4 :: Int]
     tree  = Node (Node Leaf 1 Leaf) 2 (Node Leaf (3 :: Int) Leaf)
     layer = R (I 3 :*: I 4) :: ExprF Int
     small = add (add (val 1) (val 2)) (add (val 3) (val 4))
